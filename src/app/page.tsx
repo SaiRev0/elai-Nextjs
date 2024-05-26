@@ -1,7 +1,10 @@
 "use client";
 
 import axios from "axios";
-import { useState } from "react";
+import { useState, useEffect } from "react";
+import io from "socket.io-client";
+let socket;
+let peerConnection: RTCPeerConnection;
 
 export default function Home() {
   const [text, setText] = useState("");
@@ -14,6 +17,19 @@ export default function Home() {
   const avatarCode = "gia";
   const voiceId = "LcfcDJNUP1GQjkzn1xUU";
   const voiceProvider = "elevenlabs";
+
+  const connectToSignalingServer = () => {
+    socket = io("http://localhost:8080/");
+    socket.on("connect", () => {
+      console.log("Connected to signaling server");
+      // Initialize peer connection after successful connection to the signaling server
+      // initPeerConnection(socket);
+    });
+  };
+
+  useEffect(() => {
+    connectToSignalingServer();
+  }, []);
 
   const createStream = async () => {
     setText("Creating Stream...");
@@ -73,14 +89,43 @@ export default function Home() {
         },
         data: JSON.stringify({ answer }),
       });
-
+      setText("Stream Started");
       console.log(result);
     } catch (e) {
       console.log(e);
     }
   };
 
-  const submitCandidate = async () => {};
+  const submitCandidate = async () => {
+    console.log("Ye hua");
+
+    peerConnection = new RTCPeerConnection({
+      iceServers: iceServers,
+    });
+    console.log("Ye hua 2");
+    peerConnection.onicecandidate = async (event) => {
+      if (!event.candidate) {
+        console.log("Candidate is null");
+        throw new Error("Candidate is null");
+      }
+      console.log(event.candidate);
+      try {
+        const res = await axios({
+          method: "post",
+          url: `https://apis.elai.io/api/v1/streams/candidate/${id}`,
+          headers: {
+            Authorization: `Bearer ${AUTH_KEY}`,
+            "Content-Type": "application/json",
+            accept: "application/json",
+          },
+          data: { candidate: event.candidate },
+        });
+        console.log(res);
+      } catch (e) {
+        console.log(e);
+      }
+    };
+  };
 
   const deleteStream = async () => {
     setText("Deleting Stream...");
@@ -92,6 +137,7 @@ export default function Home() {
           Authorization: `Bearer ${AUTH_KEY}`,
         },
       });
+      setText("Stream Deleted");
     } catch (e) {
       console.log(e);
     }
